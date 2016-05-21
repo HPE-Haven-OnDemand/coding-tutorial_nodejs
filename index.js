@@ -1,42 +1,42 @@
-express = require('express')
-app = express()
-http = require('http').Server(app)
-bodyParser = require('body-parser')
-urlencoded = bodyParser.urlencoded({extended: false})
-havenondemand = require('havenondemand')
-client = new havenondemand.HODClient('http://api.havenondemand.com', 'API_KEY')
+'use strict';
+var expressApp = require('express')()
+var urlencoded = require('body-parser').urlencoded({extended: false}) 
+var havenondemand = require('havenondemand')
 
-port = process.env.PORT || 5000
+var port = process.env.PORT || 5000
+var client = new havenondemand.HODClient('API_KEY', 'v1', 'OPTIONAL_PROXY')
 
-app.post('/text_processor', urlencoded, function(req, res){
+var outputResults = function(text, sentiment, score, concepts, entities) {
+  console.log("\n---------------------------------------------")
+  console.log("---------------------------------------------")
+  console.log("RECEIVED: ", text)
+  console.log("\nSENTIMENT: ", sentiment, " | ", score)
+  console.log("\nCONCEPTS:")
+  console.log(concepts)
+  console.log("\nENTITIES:")
+  console.log(entities)
+  console.log("---------------------------------------------")
+  console.log("---------------------------------------------\n")
+}
+
+expressApp.post('/text_processor', urlencoded, function(req, res){
   var text = req.body["Body"]
-  var data1 = {text: text}
-  var data2 = {text: text, entity_type: ['people_eng', 'places_eng', 'companies_eng', 'organizations']}
-  client.call('analyzesentiment', data1, function(err1, resp1, body1){
-    var sentiment = resp1.body.aggregate.sentiment
-    var score = resp1.body.aggregate.score
-    client.call('extractconcepts', data1, function(err2, resp2, body2){
-      var concepts = resp2.body.concepts
-      client.call('extractentities', data2, function(err3, resp3, body3){
+  var entityData = {text: text, entity_type: ['people_eng', 'places_eng', 'companies_eng', 'organizations']}
+  
+  client.call('analyzesentiment', {text: text}, function(err1, resp1){
+    client.call('extractconcepts', {text: text}, function(err2, resp2){
+      client.call('extractentities', entityData, function(err3, resp3){
+        var sentiment = resp1.body.aggregate.sentiment
+        var score = resp1.body.aggregate.score
+        var concepts = resp2.body.concepts
         var entities = resp3.body.entities
-        console.log("---------------------------------------------")
-        console.log("---------------------------------------------")
-        console.log(text + " | " + sentiment + " | " + score)
-        printStuff("Concepts", concepts)
-        printStuff("Entities", entities)
+        outputResults(text, sentiment, score, concepts, entities)
+        res.sendStatus(200)
       })
     })
   })
 })
 
-printStuff = function(string, arr) {
-  console.log("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~")
-  console.log(string + ": ")
-  for (var i=0; i<arr.length;i++) {
-    console.log(arr[i])
-  }
-}
-
-http.listen(port, function(){
-  console.log("listening on port: " + port)
+expressApp.listen(port, function(){
+  console.log("Listening on port: ", port)
 })
